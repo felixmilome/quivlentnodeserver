@@ -1,5 +1,6 @@
 
 const { CommentsModel } = require( "../models/commentsModel");
+const {PostsModel} = require ('../models/postsModel.js') 
 
 exports.addCommentCtrl = async(req,res) => {
  
@@ -7,20 +8,52 @@ exports.addCommentCtrl = async(req,res) => {
     try{
     
       const userId = req.userId;
+      const {content, type, postId} = req.body
+     
 
-        const newCommentData = {
-            creatorMiniProfile: userId, 
-            content: req.content
-          };
+      const newCommentData = {
+        creatorMiniProfile: userId, 
+        content,
+        postId,
+        type,
+        ...(type === 'reply' && { parentCommentId: req.body?.parentCommentId })
+      };
+      const newComment = new CommentsModel(newCommentData);
+      const savedComment = await newComment.save();
 
-          const newComment = new CommentsModel(newCommentData);
-          const savedComment = await newComment.save();
+      const populatedComment = await CommentsModel.findById(savedComment._id)
+        .populate({
+          path: 'creatorMiniProfile',
+          select: 'username dpPath _id'
+        });
+
+
+        // Find the parent post by postId
+        const post = await PostsModel.findById(postId);
+        //console.log(post)
+        if (!post) {
+          return res.json({ status: 'error', message: 'Post not found' });
+        }
+
+        post.commentsArray.push(savedComment?._id);
+        await post.save();
+
+        // If the comment is a reply, find the parent comment and push the reply's ID into it
+        if (type === 'reply') {
+          const parentComment = await CommentsModel.findById(req.body.parentCommentId);
+          if (!parentComment) {
+            return res.json({ status: 'error', message: 'Parent comment not found' });
+          }
+          // Push the new comment's ID into the parent comment's replies array
+          parentComment.repliesArray.push(savedComment._id);
+          await parentComment.save(); // Save the updated parent comment
+        }
           
-          res.json({status:'success', data:savedComment, message:'Commented successfully!'});
+          res.json({status:'success', data:populatedComment, message:'Commented successfully!'});
         
 
         } catch (error){
-            console.log(error.message);
+            console.log(error);
             res.json({ status:'error', message: 'Internal Server Error. Please Try Later'});
         
         }
@@ -53,6 +86,7 @@ exports.getCommentsCtrl = async(req, res) => {
 
 exports.getACommentCtrl = async(req, res) => {
   const {commentId} = req.body;
+  
   try {
       const Comment = await CommentsModel.findById(commentId)
         .populate({
@@ -75,14 +109,15 @@ exports.getACommentCtrl = async(req, res) => {
 }
 
 exports.likeCommentCtrl = async (req, res) => {
-  const { commentId, type, generalType } = req.body; // Make sure generalType is included
-  const userId = req.userId; // Assuming the user ID is set in the request context
 
+  const { commentId, type, generalType} = req.body; // Make sure generalType is included
+  const userId = req.userId; // Assuming the user ID is set in the request context
+  console.log(req.body);
   try {
     // Find the Comment by ID
-    const Comment = await CommentsModel.findById(commentId);
+    const comment = await CommentsModel.findById(commentId);
 
-    if (!Comment) {
+    if (!comment) {
       return res.status(404).json({ message: "Comment not found" });
     }
 
@@ -92,23 +127,36 @@ exports.likeCommentCtrl = async (req, res) => {
         'LIKE_COMMENT': 'likersArray',
         'DISLIKE_COMMENT': 'dislikersArray',
         'REVIEW_COMMENT_COUNT': 'commentersArray',
-        'UNLIKE_COMMENT': 'likersArray',
-        'UNDISLIKE_COMMENT': 'dislikersArray'
       };
+
       const key = actionToArrayMap[type];
 
-      // Ensure key is valid before pushing
       if (key) {
-        // Check if user already exists in the array (for LIKE and DISLIKE)
-        if (type === 'LIKE_COMMENT' && Comment.likersArray.includes(userId)) {
-          return res.status(400).json({ message: "User has already liked this Comment" });
-        }
-        if (type === 'DISLIKE_COMMENT' && Comment.dislikersArray.includes(userId)) {
-          return res.status(400).json({ message: "User has already disliked this Comment" });
-        }
-        Comment[key].push(userId);
-      }
+        if (type === 'LIKE_COMMENT') {
+          // If user has disliked the post, remove them from the dislikersArray
+          await comment.updateOne({ $pull: { dislikersArray: userId } });
 
+          // Check if user has already liked the post
+          if (comment.likersArray.includes(userId)) {
+            return res.status(400).json({ message: "User has already liked this comment" });
+          }
+
+          // Add the user to the likersArray
+          comment.likersArray.push(userId);
+        } 
+        else if (type === 'DISLIKE_COMMENT') {
+          // If user has liked the post, remove them from the likersArray
+          await comment.updateOne({ $pull: { likersArray: userId } });
+
+          // Check if user has already disliked the post
+          if (comment.dislikersArray.includes(userId)) {
+            return res.status(400).json({ message: "User has already disliked this comment" });
+          }
+
+          // Add the user to the dislikersArray
+          comment.dislikersArray.push(userId);
+        }
+      }
     } else if (generalType === 'undo') {
       const undoToArrayMap = {
         'UNLIKE_COMMENT': 'likersArray',
@@ -116,26 +164,28 @@ exports.likeCommentCtrl = async (req, res) => {
       };
       const undoKey = undoToArrayMap[type];
 
-      // Ensure undoKey is valid before removing
       if (undoKey) {
-        Comment[undoKey] = Comment[undoKey].filter(userIdInArray => userIdInArray.toString() !== userId.toString());
+        // Remove the user from the corresponding array
+        await comment.updateOne({ $pull: { [undoKey]: userId } });
       }
     }
 
-    // Save the updated Comment
-    await Comment.save();
+    // Save the updated post
+    await comment.save();
+    return res.status(200).json({ status: 'success', message: "Success" });
 
-    return res.status(200).json({ status: 'success', message: "success" });
   } catch (error) {
+
     console.error(error);
     return res.status(500).json({ status: 'error', message: "An error occurred" });
+
   }
 }
 exports.editCommentCtrl = async (req, res) => {
   const { commentId } = req.params; // Assuming commentId is passed in the URL params
   const userId = req.userId;
 
-  try {
+  try { 
     // Find the Comment by ID and update it
     const updatedComment = await CommentsModel.findByIdAndUpdate(
       commentId,

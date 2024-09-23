@@ -17,7 +17,7 @@ const postsSchema = Schema({
   likersArray: [String],
   dislikersArray:[String],
   viewersArray:[String],
-  commentersArray:[String],
+  commentsArray:[String],
   createdTime: { type: Date, default: Date.now },  // Timestamp for when the comment was created
   updatedTime: { type: Date, default: Date.now },  // Timestamp for when the comment was last edited
   comments: [String],

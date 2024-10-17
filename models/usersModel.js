@@ -95,7 +95,7 @@ const usersSchema = mongoose.Schema({
     default: true,
   },
   suspended:{
-    type:String,
+    type:Boolean,
     default:false
   },
   suspendedReason: {

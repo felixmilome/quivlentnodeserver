@@ -1,82 +1,159 @@
 const {UsersModel} = require('../models/usersModel.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const {generateOtp} = require('../functions/index.js')
+const {jwtDecode} = require ('jwt-decode');
+const {generateOtp, generateRandomString, generateUsernameFromEmail} = require('../functions/index.js')
 const { mailVerificationLink } = require('./emailsController.js')
+const {OAuth2Client} = require('google-auth-library');
+const { promisify } = require('util');
+
 
 require('dotenv').config();
 const jwtSecret = process.env.JWT_SECRET;
+const jwtOtpSecret = process.env.JWT_OTP_SECRET;
+const googleClientId = '713960857676-8funqpldk4d6cobt0f467giarc1u16tu.apps.googleusercontent.com'
+const googleClient = new OAuth2Client(googleClientId);
+const verifyJwt = promisify(jwt.verify);
 
 exports.registerCtrl = async (req,res) => { 
     
 
     try {
 
-        const {identifier, identifierType, username, password, countryCode, dialCode} = req.body;
-        console.log(req.body);
-        if (
-            (![identifier, identifierType, username, password].every(val => val && val?.length > 0))
-            ||
-            (identifierType === 'phone' && ![countryCode, dialCode].every(val => val && val?.length > 0))
-        ) 
-        {
-            return res.json({ status: 'error', message: 'input value error' });
-        }
+        const {identifierType} = req.body;
 
-        const identityMatchQuery = identifierType === 'phone' 
-            ? { phone: identifier, phoneVerified: true } 
-            : identifierType === 'email' 
-            ? { email: identifier, emailVerified: true } 
-            : null;
+        if (identifierType === 'gmail'){
 
-        const existingUser = await UsersModel.findOne(identityMatchQuery, { _id: 1 });
-        const existingUsername = await UsersModel.findOne({username:username})
+            const googleData = jwtDecode(req.body.googleCredential);      
 
-        if(existingUser?._id?.length>0) return res.json({status: 'error', message: `${identifierType} already in use`});
-        if(existingUsername?._id?.length>0) return res.json({status: 'error', message: `username already in use`});
-        if( /^\S+$/.test(password) === false || password?.length < 5 || password?.length > 26)  res.json({status: 'error', message:"Invalid Password Format"});
-        
-        const hashedPassword = await bcrypt.hash (password, 12);  
+            const googleTicket = await googleClient.verifyIdToken({
+                idToken:req.body.googleCredential,
+                audience: googleClientId   // Specify the CLIENT_ID of the app that accesses the backend
+            });
 
-        const otp = await generateOtp(5)
-        const otpToken = jwt.sign({otpNumber: otp}, jwtSecret, {expiresIn: "24h"});
-        const mkTimeNow = Date.now()
+            const payload = googleTicket.getPayload();
+            const {aud,exp,iss, email} = googleData;
 
-        await UsersModel.deleteMany(
-            identifierType === 'phone' 
-            ?  {phone:identifier}
-            : {email:identifier},
-        );
+      
+            console.log(payload);
 
-        const newUser = {
-            username,
-            password: hashedPassword,
-            createdTime: mkTimeNow,
-            authOtp: otp
-          };
-          
-          // Set phone or email based on identifierType
-          if (identifierType === 'phone') {
-            newUser.phone = identifier;
-          } else if (identifierType === 'email') {
-            newUser.email = identifier;
-          }
+            if (aud === payload.aud && exp === payload.exp && iss === payload.iss && email === payload.email){
+                
+                const existingUser = await UsersModel.findOne({ email: email, emailVerified: true } , {_id:1});
+                console.log(existingUser);
+                if(existingUser){
 
-        const createdUser = await UsersModel.create(newUser);
-        const token = jwt.sign({userId: createdUser._id}, jwtSecret);
+                    const token = jwt.sign({userId: existingUser._id}, jwtSecret);                       
+                    res.json({status:'success', token:{userId:existingUser._id, token}, message:'Google Sign In Success!'});
 
-       if(identifierType === 'email'){
+                }
+                else{
+                
+                    const randUsername = generateUsernameFromEmail(email);
+                    const randPassword = generateRandomString(12);
 
-           // await mailVerificationLink (identifier, otpToken, username);
+                    const hashedPassword = await bcrypt.hash (randPassword, 12);
+                    const mkTimeNow = Date.now();
+    
+
+                    const newUser = {
+                        username: randUsername,
+                        email,
+                        password: hashedPassword,
+                        createdTime: mkTimeNow,
+                        emailVerified:true
+                    };
+
+                    console.log(newUser);
+
+                
+                    const createdUser = await UsersModel.create(newUser);
+                    const token = jwt.sign({userId: createdUser._id}, jwtSecret);
+                        
+                    res.json({status:'success', token:{userId:createdUser._id, token}, message:'Google Sign Up Success!'});
+                
+                }
+
+            }else{
+                return res.json({ status: 'error', message: 'Not authorized' });
+            }
+           
+
+
+        }else{
+
+            const {identifier, username, password, countryCode, dialCode} = req.body;
+            // console.log(req.body);
+            if (
+                (![identifier, identifierType, username, password].every(val => val && val?.length > 0))
+                ||
+                (identifierType === 'phone' && ![countryCode, dialCode].every(val => val && val?.length > 0))
+            ) 
+            {
+                return res.json({ status: 'error', message: 'input value error' });
+            }
+
+            const identityMatchQuery = identifierType === 'phone' 
+                ? { phone: identifier, phoneVerified: true } 
+                : identifierType === 'email' 
+                ? { email: identifier, emailVerified: true } 
+                : null;
+
+            const existingUser = await UsersModel.findOne(identityMatchQuery, { _id: 1 });
+            console.log(existingUser);
             
-       } else if (identifierType === 'phone') {
-            //send link to number
-       }
-       console.log(token);
-       console.log('reg')
-        
-        res.json({status:'success', token:{userId:createdUser._id, token}, message:'Sign Up Success!'});
-       
+            const existingUsername = await UsersModel.findOne({username:username})
+
+            if(existingUser) return res.json({status: 'error', message: `${identifierType} already in use`});
+            if(existingUsername?._id?.length>0) return res.json({status: 'error', message: `username already in use`});
+            if( /^\S+$/.test(password) === false || password?.length < 5 || password?.length > 26)  res.json({status: 'error', message:"Invalid Password Format"});
+            
+            const hashedPassword = await bcrypt.hash (password, 12);  
+
+            const otp = await generateOtp(5)
+            const mkTimeNow = Date.now()
+
+            await UsersModel.deleteMany(
+                identifierType === 'phone' 
+                ?  {phone:identifier}
+                : {email:identifier},
+            );
+
+            const newUser = {
+                username,
+                password: hashedPassword,
+                createdTime: mkTimeNow,
+                authOtp: otp
+            };
+            
+            // Set phone or email based on identifierType
+            if (identifierType === 'phone') {
+                newUser.phone = identifier;
+            } else if (identifierType === 'email') {
+                newUser.email = identifier;
+            }
+
+            const createdUser = await UsersModel.create(newUser);
+          
+
+            const otpToken = jwt.sign({otpNumber: otp, userId:createdUser?._id, identifierType}, jwtOtpSecret, {expiresIn: "24h"});
+
+            if(identifierType === 'email' || identifierType === 'phone' ){
+
+                console.log(`http://localhost:5173/verify/${otpToken}`);
+
+                await mailVerificationLink (identifier, otpToken, username);
+                    
+            } 
+            //else if (identifierType === 'phone') {
+            //         //send link to number
+            // }
+            const token = jwt.sign({userId: createdUser._id}, jwtSecret);
+            console.log(token);
+            console.log('reg')
+            
+            res.json({status:'success', token:{userId:createdUser._id, token}, message:'Sign Up Success!'});
+        }
         
     } catch (error) { 
 
@@ -84,6 +161,7 @@ exports.registerCtrl = async (req,res) => {
     res.json({status:'error', message: 'Internal Server Error. Please Try Later'}); 
 
     }
+    
 
 }
 
@@ -92,32 +170,94 @@ exports.loginCtrl = async (req,res) => {
 
     try{ 
 
-        const {identifier, identifierType, password} = req.body;
+        const {identifierType} = req.body;
 
-        console.log(req.body);
+        if (identifierType === 'gmail'){
+
+            const googleData = jwtDecode(req.body.googleCredential);      
+
+            const googleTicket = await googleClient.verifyIdToken({
+                idToken:req.body.googleCredential,
+                audience: googleClientId   // Specify the CLIENT_ID of the app that accesses the backend
+            });
+
+            const payload = googleTicket.getPayload();
+            const {aud,exp,iss, email} = googleData;
+
+      
+            console.log(payload);
+
+            if (aud === payload.aud && exp === payload.exp && iss === payload.iss && email === payload.email){
+                
+                const existingUser = await UsersModel.findOne({ email: email, emailVerified: true } , {_id:1});
+                console.log(existingUser);
+                if(existingUser){
+
+                    const token = jwt.sign({userId: existingUser._id}, jwtSecret);                       
+                    res.json({status:'success', token:{userId:existingUser._id, token}, message:'Google Sign In Success!'});
+
+                }
+                else{
+                
+                    const randUsername = generateUsernameFromEmail(email);
+                    const randPassword = generateRandomString(12);
+
+                    const hashedPassword = await bcrypt.hash (randPassword, 12);
+                    const mkTimeNow = Date.now();
     
-        const existingUser = await UsersModel.findOne(
+
+                    const newUser = {
+                        username: randUsername,
+                        email,
+                        password: hashedPassword,
+                        createdTime: mkTimeNow,
+                        emailVerified:true
+                    };
+
+                    console.log(newUser);
+
+                
+                    const createdUser = await UsersModel.create(newUser);
+                    const token = jwt.sign({userId: createdUser._id}, jwtSecret);
+                        
+                    res.json({status:'success', token:{userId:createdUser._id, token}, message:'Google Sign Up Success!'});
+                
+                }
+
+            }else{
+                return res.json({ status: 'error', message: 'Not authorized' });
+            }
+           
+
+
+        }else{
+
+            const {identifier, identifierType, password} = req.body;
+
+            console.log(req.body);
+        
+            const existingUser = await UsersModel.findOne(
+                
+                identifierType === 'phone'
+                    ? {phone:identifier}
+                    : {email:identifier}, 
+                {_id:1, password:1}
+            );
+            console.log(existingUser);
+
+            if (!existingUser) return res.json({status: 'error', message: "Invalid Log In Credentials"});
+
+            const passwordCorrect = await bcrypt.compare(password, existingUser?.password);
+
+            if (!passwordCorrect) return res.json({status: 'error', message: "Invalid Log In Credentials"});
+
+            //console.log(loggedUser);
+            const token = jwt.sign({userId: existingUser._id}, jwtSecret);
+            console.log(token);
+            console.log('log')
             
-            identifierType === 'phone'
-                ? {phone:identifier}
-                : {email:identifier}, 
-            {_id:1, password:1}
-        );
-        console.log(existingUser);
-
-        if (!existingUser) return res.json({status: 'error', message: "Invalid Log In Credentials"});
-
-        const passwordCorrect = await bcrypt.compare(password, existingUser?.password);
-
-        if (!passwordCorrect) return res.json({status: 'error', message: "Invalid Log In Credentials"});
-
-        //console.log(loggedUser);
-        const token = jwt.sign({userId: existingUser._id}, jwtSecret);
-        console.log(token);
-        console.log('log')
-        
-        res.json({status:'success', token:{userId:existingUser._id, token}, message:'Log In Success!'});
-        
+            res.json({status:'success', token:{userId:existingUser._id, token}, message:'Log In Success!'});
+        }
 
     } catch (error){
         console.log(error.message);
@@ -125,6 +265,56 @@ exports.loginCtrl = async (req,res) => {
     
     }
 }
+
+
+exports.verifyRegisterLinkCtrl = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        console.log(token)
+
+        // Step 1: Verify the JWT token
+        jwt.verify(token, jwtSecret, async (err, decodedData) => {
+            if (err) {
+                if (err.name === 'TokenExpiredError') {
+                    return res.json({ status: 'error', message: 'Token expired' });
+                } else {
+                    return res.json({ status: 'error', message: 'Invalid token' });
+                }
+            }
+
+            const { otpNumber, userId, identifierType } = decodedData; // Extract necessary data from decoded token
+
+            // Step 2: Fetch user by userId
+            const existingUser = await UsersModel.findById(userId, { _id: 1, authOtp: 1 });
+
+            if (!existingUser) {
+                return res.json({ status: 'error', message: 'User not found' });
+            }
+
+            // Step 3: Compare the decoded OTP with user's stored OTP
+            if (!otpNumber?.length > 0 || otpNumber !== existingUser.authOtp) {
+                return res.json({ status: 'error', message: 'Invalid OTP' });
+            }
+
+            // Step 4: Update user and clear OTP after successful verification
+            await UsersModel.findByIdAndUpdate(userId, { authOtp: null, [identifierType === 'phone' ? 'phoneVerified' : 'emailVerified']: true });
+
+
+            // Step 5: Generate a new token for further use
+            const newToken = jwt.sign({ userId: existingUser._id }, jwtSecret);
+
+            // Step 6: Send success response
+            res.json({status:'success', token:{userId:existingUser._id, token:newToken}, message:'Verification Success!'});
+        });
+
+    } catch (error) {
+        res.json({ status: 'error', message: 'Verification failed' });
+    }
+};
+
+ 
+
 
 // exports.verifyPhoneOtpCtrl = async (req,res) => {
 

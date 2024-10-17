@@ -9,7 +9,7 @@ exports.addPostCtrl = async(req,res) => {
     
       const userId = req.userId;
       const captionsArr = JSON.parse(req.body.captions);
-      console.log(captionsArr)
+      // console.log(captionsArr)
   
   
 

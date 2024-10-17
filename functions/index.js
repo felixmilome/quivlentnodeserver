@@ -54,4 +54,35 @@ exports.tokenVerifier = async(tok)=>{
    
   }
 
+  exports.convertToUnixTime = (dateString) => {
+    // Check if the input is already a numeric string and convert it to a number
+    if (!isNaN(dateString)) {
+      return Number(dateString); // Convert to number if it's a numeric string
+    }
+  
+    const dateObj = new Date(dateString);
+    return Math.floor(dateObj.getTime() / 1000); // Return the Unix timestamp
+  };
+
+
+
+ exports.generateRandomString = (length) =>{
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        const randomIndex = Math.floor(Math.random() * characters.length);
+        result += characters[randomIndex];
+    }
+    return result;
+}
+
+exports.generateUsernameFromEmail = (email) => {
+    const [username] = email.split('@'); // Get the part before '@'
+    const randomCode = exports.generateRandomString(6); // Change the number to adjust the length of the random code
+    return `${username}${randomCode}`; // Combine username and random code
+}
+
+
+
+
  

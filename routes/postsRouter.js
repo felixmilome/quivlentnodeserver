@@ -7,10 +7,9 @@ const {
 addCommentCtrl, getACommentCtrl,
  getCommentsCtrl, editCommentCtrl,
 deleteCommentCtrl, likeCommentCtrl
-}= require('../controllers/commentsController.js')
-// import { auth } from '../middleware/authMiddleware.js';
+}= require('../controllers/commentsController.js');
 const {multerUpload} = require("../middleware/multer.js");
-const {auth}= require("../middleware/authMiddleware.js")
+const {auth} = require("../middleware/authMiddleware.js")
 
 const postsRouter = express.Router(); 
 

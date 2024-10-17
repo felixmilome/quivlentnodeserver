@@ -1,12 +1,13 @@
 const nodemailer = require("nodemailer");
+require('dotenv').config();
 
-const logoUrl = 'https://zoorura.com/assets/images/whitelogo.png'
+const logoUrl = ''
 //const mainUrl = 'https://zoorura.com'
-const mainUrl = 'http://localhost:3000'
+const mainUrl = 'http://localhost:5173/'
 
 
 //nodemailer transporter console
- let transporter = nodemailer.createTransport({
+ const transporter = nodemailer.createTransport({
    host: 'quivlent.com',
     port: 465,
     secure: true, 
@@ -379,10 +380,10 @@ const mainUrl = 'http://localhost:3000'
                                 
                                 <p>An account called @<b>${username}</b> was created using this email in Quivlent. Click Link to verify. Ensure it's the latest Link sent. Expiry in 24hrs:</p>
                                 
-                                <h1><a href="${mainUrl}/verify?token=${token}">CLICK HERE TO VERIFY</a></h1>
+                                <h1><a href="${mainUrl}/verify/${token}">CLICK HERE TO VERIFY</a></h1>
 
                                 <p>If the click is not redirecting, copy paste the link below on your browser: </b>
-                                <p> ${mainUrl}/verify?token=${token} </p>
+                                <p> ${mainUrl}/verify/${token} </p>
                                 <p>NOTE:Previous Links are Invalid</p>
 
                                
@@ -404,14 +405,14 @@ const mainUrl = 'http://localhost:3000'
                       <table role="presentation" border="0" cellpadding="0" cellspacing="0">
                         <tr>
                           <td class="content-block">
-                            <span class="apple-link">Zoorura Technologies Ltd, Nairobi, Kenya</span>
+                            <span class="apple-link">Quivlent Technologies Ltd, Nairobi, Kenya</span>
                             <br> This is an auto generated email for @${username}. Please do not reply
-                            <br> Ignore if it is not you. Or report violation to security@zoorura.com
+                            <br> Ignore if it is not you. Or report violation to security@quivlent.com
                           </td>
                         </tr>
                         <tr>
                           <td class="content-block powered-by">
-                          <a href= "https://www.zoorura.com/"> Powered by Zoorura </a>
+                          <a href= "https://quivlent.com/"> Powered by Zoorura </a>
                           </td>
                         </tr>
                         <tr>
@@ -1239,7 +1240,7 @@ const mainUrl = 'http://localhost:3000'
                       </tr>
                       <tr>
                         <td class="content-block powered-by">
-                          Powered by Zoorura Technologies.
+                          Powered by Quivlent Technologies.
                         </td>
                       </tr>
                       <tr>

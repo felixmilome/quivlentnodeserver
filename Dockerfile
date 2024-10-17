@@ -1,13 +1,33 @@
-FROM node:18
+FROM debian:bullseye as builder
 
+ARG NODE_VERSION=20.9.0
+ARG YARN_VERSION=1.22.22
+
+RUN apt-get update; apt install -y curl
+RUN curl https://get.volta.sh | bash
+ENV VOLTA_HOME /root/.volta
+ENV PATH /root/.volta/bin:$PATH
+RUN volta install node@${NODE_VERSION} yarn@${YARN_VERSION}
+
+#######################################################################
+
+RUN mkdir /app
 WORKDIR /app
 
-COPY package*.json ./
-
-RUN npm install --production
+ENV NODE_ENV production
 
 COPY . .
 
-EXPOSE 5000
+RUN yarn install
+FROM debian:bullseye
 
-CMD [ "node", "server.js" ]
+LABEL fly_launch_runtime="nodejs"
+
+COPY --from=builder /root/.volta /root/.volta
+COPY --from=builder /app /app
+
+WORKDIR /app
+ENV NODE_ENV production
+ENV PATH /root/.volta/bin:$PATH
+
+CMD [ "yarn", "run", "start" ]

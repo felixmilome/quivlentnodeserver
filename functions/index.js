@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 exports.generateOtp =async(length)=> {
     // const min = 10000; 
     // const max = 99999; 
@@ -80,6 +82,38 @@ exports.generateUsernameFromEmail = (email) => {
     const [username] = email.split('@'); // Get the part before '@'
     const randomCode = exports.generateRandomString(6); // Change the number to adjust the length of the random code
     return `${username}${randomCode}`; // Combine username and random code
+}
+
+
+exports.ipGeolocator = async (ipAddress) => {
+  if (!ipAddress) return null;
+  try {
+    const response = await fetch(
+      `https://ipinfo.io/${ipAddress}?token=${process.env.IP_INFO_TOKEN}`
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch IP info");
+    }
+
+    const data = await response.json();
+    console.log(data);
+
+    if(!data?.loc) return null
+
+    const [lat, lng] = data?.loc.split(','); 
+    const region = data?.city || data?.region || '';
+    const countryCode = data?.country || '';
+
+    const returnData = {state:true, coordinates:{lat, lng}, region, countryCode}
+    console.log(returnData);
+    return returnData;
+
+ 
+  } catch (err) {
+    console.log(err.message);
+    return null;
+  }
 }
 
 

@@ -1,6 +1,15 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
+const miniPostSchema = new Schema({
+  indexId:Number,
+  caption:String,
+  noneRating:Boolean,
+  imageUrl:String,
+  ratingsArray:[String]
+
+}, { _id: false });
+
 
 const postsSchema = Schema({
   creatorMiniProfile: {
@@ -8,18 +17,24 @@ const postsSchema = Schema({
     ref: "UsersModel",
 
   },
-  captionsArray: [String],
-  filesArray: [String],
+  title:String,
+  miniPostsArray:[miniPostSchema],
+  // captionsArray: [String],
+  // filesArray: [String],
   publicity: {
     type: String,
     default: "public",
   },
   likersArray: [String],
-  dislikersArray:[String],
+  dislikersArray:[String], 
   viewersArray:[String],
   commentsArray:[String],
-  createdTime: { type: Date, default: Date.now },  // Timestamp for when the comment was created
-  updatedTime: { type: Date, default: Date.now },  // Timestamp for when the comment was last edited
+  createdTime: { 
+    type: Number,
+    default: Date.now
+  },  // Timestamp for when the comment was created
+  updatedTime: {   type: Number,
+    default: Date.now },  // Timestamp for when the comment was last edited
   comments: [String],
 
 });

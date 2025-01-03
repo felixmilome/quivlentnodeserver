@@ -1,9 +1,42 @@
 const mongoose = require("mongoose");
 
+// {
+//   ip: '41.90.187.65',
+//   city: 'Nairobi',
+//   region: 'Nairobi County',
+//   country: 'KE', 
+//   loc: '-1.2833,36.8167',
+//   org: 'AS33771 Safaricom Limited',
+//   postal: '00800',
+//   timezone: 'Africa/Nairobi'
+// }
+
 const coordinatesSchema = new mongoose.Schema({
     lat: { type: Number, default:null },
     lng: { type: Number, default:null }
   }, { _id: false });
+
+const timelinePhotoSchema = new mongoose.Schema({
+  indexId:Number,
+  photoPath:String
+}, { _id: false });
+
+const matchesSchema = new mongoose.Schema({
+  userId:String,
+  status:String,
+  matchedDate: Number
+
+}, { _id: false });
+
+const blockedSchema = new mongoose.Schema({
+  userId:String,
+  blockedDate: {
+    type: Number,
+    default:Date.now,
+  }
+  
+
+}, { _id: false });
 
 const usersSchema = mongoose.Schema({ 
 
@@ -24,6 +57,10 @@ const usersSchema = mongoose.Schema({
     default: null,
   },
   gender: {
+    type: String,
+    default: null,
+  },
+  relationshipStatus: {
     type: String,
     default: null,
   },
@@ -61,8 +98,10 @@ const usersSchema = mongoose.Schema({
     type: String,
     default:null,
   },
-  photoPathsArray:[],
-  location: {
+  matchesArray:[matchesSchema],
+  photoPathsArray:[timelinePhotoSchema],
+  blockedArray:[blockedSchema],
+  region: {
     type: String,
     default: null,
   },
@@ -79,8 +118,8 @@ const usersSchema = mongoose.Schema({
     default:null
   },
   createdTime: {
-    type: Date,
-    default: new Date(),
+    type: Number,
+    default: Date.now
   },
   phoneVerified: {
     type: Boolean,
@@ -94,6 +133,10 @@ const usersSchema = mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  muted: {
+    type: Boolean,
+    default: false,
+  },
   suspended:{
     type:Boolean,
     default:false
@@ -104,7 +147,7 @@ const usersSchema = mongoose.Schema({
   },
   suspensionEndDate: {
     type: Number,
-    default:parseInt(Date.now()),
+    default: Date.now
   }
 
 });

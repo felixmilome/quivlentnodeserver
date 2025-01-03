@@ -1,7 +1,7 @@
 const express = require('express');
 const {addPostCtrl, getPostsCtrl,
      getAPostCtrl, likePostCtrl, 
-     editPostCtrl, deletePostCtrl,
+     editPostCtrl, deletePostCtrl, rateMiniPostCtrl
     } = require('../controllers/postsController.js');
 const {
 addCommentCtrl, getACommentCtrl,
@@ -17,6 +17,7 @@ postsRouter.post ('/addPost', auth, multerUpload.array("files"), addPostCtrl);
 postsRouter.post ('/getPosts', getPostsCtrl);
 postsRouter.post ('/getAPost', getAPostCtrl);
 postsRouter.post ('/likePost',auth, likePostCtrl);
+postsRouter.post ('/rateMiniPost',auth, rateMiniPostCtrl);
 postsRouter.post ('/editPost',auth, editPostCtrl);
 postsRouter.post ('/deletePost',auth, deletePostCtrl);
 

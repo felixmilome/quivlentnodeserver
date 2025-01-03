@@ -1,7 +1,7 @@
 const { ChatsModel } = require('../models/chatsModel');
 const { MessagesModel } = require('../models/messagesModel');
 const { UsersModel } = require('../models/usersModel'); // Adjust path as necessary
-
+const {createNotification} = require('./controllerHandlers/notificationHandlers.js')
 exports.getChatsCtrl = async (req, res) => {
   try {
     const userId = req.userId; // Assuming you have user ID from req.user
@@ -14,7 +14,8 @@ exports.getChatsCtrl = async (req, res) => {
       })
       .populate({
         path: 'participants', // Populate participants
-        select: '_id username dpPath', // Fields to select from UsersModel
+        select: '_id username dpPath blockedArray', 
+        // Blocked only on get others of post wont be posible. Coz even starting chat wont be possible since profile is blocked.
       });
 
     return res.status(200).json({status:'success', data:chats, message:'success'});
@@ -40,7 +41,7 @@ exports.getMessagesCtrl = async (req, res) => {
           select: '_id username dpPath', // Fields to select from UsersModel
         })
        // .sort({ sentAt: 1 }); // Sort messages by sentAt in ascending order
-       console.log(messages);
+      //  console.log(messages);
 
         const chat = await ChatsModel.findById(
           chatId,
@@ -66,18 +67,22 @@ exports.getMessagesCtrl = async (req, res) => {
       const {type, receiverId, messageText} = req?.body;
       const senderId = req.userId;
 
+      console.log(req.body)
+
       const existingChat = await ChatsModel.findOne({
         participants: { $all: [senderId, receiverId] } // Ensure both participants are in the array
       })
       console.log(existingChat?._id);
 
       // if(existingChat && existingChat?.accepted === false) {
-      if(existingChat && type === 'request') {
-        return res.status(201).json({ status: 'success', message: 'Request was already sent'});
-      }
+      // if(existingChat && type === 'request') {
+      //   return res.status(201).json({ status: 'success', message: 'Request was already sent'});
+      // }
       
       
-      if (existingChat && type ==='matched'){
+      if (existingChat 
+        // && type ==='matched'
+      ){
 
           const chatId = existingChat?._id
          
@@ -114,10 +119,22 @@ exports.getMessagesCtrl = async (req, res) => {
           path: 'lastMessage',
           select: 'messageText sentAt' // Populate lastMessage with specific fields
         });
+
+        const newNotification = await createNotification({
+          senderMiniProfile: senderId,
+          receiverId,
+          type:'chat',
+          referenceId: editedChat?._id
+        });
+
+        console.log(newNotification);
+
         
-        return res.status(201).json({ status: 'success', data: {newMessage:populatedMessage, newChat:editedChat}, message: 'Message sent successfully' });
+        return res.status(201).json({ status: 'success', data: {newMessage:populatedMessage, newChat:editedChat, newNotification}, message: 'Message sent successfully' });
       
-      } else if(!existingChat && type === 'request'){
+      } else if(!existingChat 
+        // && type === 'request'
+      ){
 
         const chatData = new ChatsModel({
           participants: [senderId, receiverId], // participants should be an array of user IDs
@@ -160,7 +177,14 @@ exports.getMessagesCtrl = async (req, res) => {
           path: 'lastMessage',
           select: 'messageText sentAt' // Populate lastMessage with specific fields
         });
-        return res.status(201).json({ status: 'success', data: {newMessage:populatedMessage, newChat:updatedChat}, message: 'Sent Successfully' });
+        const newNotification = await createNotification({
+          senderMiniProfile: senderId,
+          receiverId,
+          type:'chat',
+          referenceId: updatedChat?._id
+        });
+
+        return res.status(201).json({ status: 'success', data: {newMessage:populatedMessage, newChat:updatedChat, newNotification}, message: 'Sent Successfully' });
 
       }
   
@@ -175,14 +199,46 @@ exports.getMessagesCtrl = async (req, res) => {
   
 exports.editMessageCtrl = async (req, res) => {
     try {
-      const { messageId, newMessageText } = req.body; // Extract messageId and newMessageText from request body
+
+      const {messageId} = req.body;
+
+      if(req.body?.type ==='read'){
+        const updatedMessage = await MessagesModel.findByIdAndUpdate(
+          messageId,
+          { seen: true},
+          { new: true } // Option to return the updated document
+        ).populate({
+          path: 'senderId', // Populate sender's details
+          select: '_id username dpPath', // Fields to select from UsersModel
+        })
+        .populate({
+          path: 'receiverId', // Populate receiver's details
+          select: '_id username dpPath', // Fields to select from UsersModel
+        });
+
+        if (!updatedMessage) {
+          return res.status(404).json({ status: 'error', message: 'Message not found' });
+        }
+    
+        return res.status(200).json({ status: 'success', data: updatedMessage, message: 'Message updated successfully' });
+
+      }
+
+      const {newMessageText } = req.body; // Extract messageId and newMessageText from request body
   
       // Find the message by its ID and update the messageText
       const updatedMessage = await MessagesModel.findByIdAndUpdate(
         messageId,
         { messageText: newMessageText },
         { new: true } // Option to return the updated document
-      );
+      ).populate({
+        path: 'senderId', // Populate sender's details
+        select: '_id username dpPath', // Fields to select from UsersModel
+      })
+      .populate({
+        path: 'receiverId', // Populate receiver's details
+        select: '_id username dpPath', // Fields to select from UsersModel
+      });
   
       // Check if the message was found and updated
       if (!updatedMessage) {

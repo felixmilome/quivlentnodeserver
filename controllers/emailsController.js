@@ -1,9 +1,9 @@
 const nodemailer = require("nodemailer");
 require('dotenv').config();
 
-const logoUrl = ''
-//const mainUrl = 'https://zoorura.com'
-const mainUrl = 'http://localhost:5173/'
+const logoUrl = 'https://quivlent.com/quivlentlogo512.png'
+const mainUrl = 'https://quivlent.com'
+// const mainUrl = 'http://localhost:5173'
 
 
 //nodemailer transporter console
@@ -17,13 +17,13 @@ const mainUrl = 'http://localhost:5173/'
     } 
   });
 
-  exports.mailVerificationLink = async (userEmail, token, username) => {
+  exports.mailVerificationLink = async (userEmail, subject, path, token, username) => {
 
 
       const mailOptions = {
         from: 'Quivlent <noreply@quivlent.com>', 
         to: userEmail, 
-        subject: "Quivlent Email Verification",
+        subject: subject,
         html: `<!doctype html>
         <html>
           <head>
@@ -378,12 +378,13 @@ const mainUrl = 'http://localhost:5173/'
                             <tr>
                               <td>
                                 
-                                <p>An account called @<b>${username}</b> was created using this email in Quivlent. Click Link to verify. Ensure it's the latest Link sent. Expiry in 24hrs:</p>
+                                <p>Dear @<b>${username}</b></p>,
+                                <p> Click the link below to ${subject}. Ensure it's the latest Link sent. Expiry in 24hrs:</p>
                                 
-                                <h1><a href="${mainUrl}/verify/${token}">CLICK HERE TO VERIFY</a></h1>
+                                <h1><a href="${mainUrl}/${path}/${token}">Click Here To ${subject}</a></h1>
 
                                 <p>If the click is not redirecting, copy paste the link below on your browser: </b>
-                                <p> ${mainUrl}/verify/${token} </p>
+                                <p> ${mainUrl}/${path}/${token} </p>
                                 <p>NOTE:Previous Links are Invalid</p>
 
                                
@@ -412,7 +413,7 @@ const mainUrl = 'http://localhost:5173/'
                         </tr>
                         <tr>
                           <td class="content-block powered-by">
-                          <a href= "https://quivlent.com/"> Powered by Zoorura </a>
+                          <a href= "https://quivlent.com/"> Powered by Quivlent </a>
                           </td>
                         </tr>
                         <tr>

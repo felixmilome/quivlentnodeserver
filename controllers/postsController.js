@@ -2,6 +2,8 @@
 const { PostsModel } = require( "../models/postsModel");
 const {uploadFilesToFirebase} = require('../functions/filesHandler.js')
 
+const postViewerPopulationData = '_id username dpPath gender region coordinates dateOfBirth'
+
 exports.addPostCtrl = async(req,res) => {
  
 
@@ -9,20 +11,41 @@ exports.addPostCtrl = async(req,res) => {
     
       const userId = req.userId;
       const captionsArr = JSON.parse(req.body.captions);
-      // console.log(captionsArr)
+      const title = JSON.parse(req.body.title);
+       console.log(captionsArr?.length)
   
   
 
         const uploadedFilesInfo = await uploadFilesToFirebase(req.files, '/post', userId);
         const downloadURLs = uploadedFilesInfo.map(file => file.downloadURL);
+
+        const miniPostsArray = captionsArr?.length>0 ? 
+          captionsArr.map((caption, index) => ({
+            indexId:index,
+            caption,
+            noneRating:false,
+            imageUrl: downloadURLs[index] || null, // Ensure pairing even if the image count is less than captions
+          }))
+        :[];
+
+        captionsArr?.length>0 && miniPostsArray.push({
+          indexId: captionsArr?.length, //will set index last automatically
+          caption: "none of the above",
+          noneRating:true,
+          imageUrl: null,  // Set to null or any other default value if no image is needed
+        });
+
         const newPostData = {
             creatorMiniProfile: userId, 
-            captionsArray: captionsArr,
-            filesArray: downloadURLs,
+            title,
+            miniPostsArray,
+            // captionsArray: captionsArr,
+            // filesArray: downloadURLs,
             creatorMiniProfile: userId, 
             publicity: 'PUBLIC',
 
           };
+          console.log(newPostData);
 
           const newPost = new PostsModel(newPostData);
           const savedPost = await newPost.save();
@@ -41,17 +64,47 @@ exports.addPostCtrl = async(req,res) => {
 
 exports.getPostsCtrl = async(req, res) => {
     try {
+
+      if(req.body?.type === 'userProfile'){ 
+
+        const {userId} = req.body;
+
+        const posts = await PostsModel.find({ creatorMiniProfile: userId })
+        .populate({
+          path: 'creatorMiniProfile',
+          select: 'username dpPath _id', //blocked array not necessary since blocking occurs during profile fetch
+        })
+        .populate({
+          path: 'viewersArray',
+          model: 'UsersModel',
+          select: postViewerPopulationData, // Select the fields you need for viewers
+        });
+  
+      return res.status(200).json({
+        status:'success',
+        data: posts,
+        message: 'posts fetched successfully'
+      });
+
+    } 
+
         const posts = await PostsModel.find()
           .populate({
             path: 'creatorMiniProfile',
-            select: 'username dpPath _id',
+            select: 'username dpPath _id blockedArray',
+          }).populate({
+            path: 'viewersArray',
+            model: 'UsersModel',
+            select: postViewerPopulationData, // Select the fields you need for viewers
           });
+    ;
     
         return res.status(200).json({
           status:'success',
           data: posts,
           message: 'posts fetched successfully'
         });
+
       } catch (error) {
         console.error('Error fetching posts:', error);
         return res.status(500).json({
@@ -68,8 +121,13 @@ exports.getAPostCtrl = async(req, res) => {
       const post = await PostsModel.findById(postId)
         .populate({
           path: 'creatorMiniProfile',
-          select: 'username dpPath _id',
+          select: 'username dpPath _id blockedArray',
+        }).populate({
+          path: 'viewersArray',
+          model: 'UsersModel',
+          select: postViewerPopulationData, // Select the fields you need for viewers
         });
+  ;
   
       return res.status(200).json({
         status:'success',
@@ -102,7 +160,8 @@ exports.likePostCtrl = async (req, res) => {
         'VIEW_POST': 'viewersArray',
         'LIKE_POST': 'likersArray',
         'DISLIKE_POST': 'dislikersArray',
-        'REVIEW_POST_COUNT': 'commentersArray'
+        'REVIEW_POST_COUNT': 'commentersArray',
+        'VIEW_POST': 'viewersArray'
       };
       const key = actionToArrayMap[type];
 
@@ -130,7 +189,22 @@ exports.likePostCtrl = async (req, res) => {
 
           // Add the user to the dislikersArray
           post.dislikersArray.push(userId);
-        }
+        }else if(type === 'VIEW_POST') {
+
+          if (!post.viewersArray.includes(userId)) {
+
+            post.viewersArray.push(userId);
+            await post.save();
+            return res.status(200).json({ status: 'success', message: "Viewed" });
+
+          }else{
+
+            return res.status(200).json({ message: "AlreadyViewed" });
+            
+          }
+          // Add the user to the likersArray
+      
+        } 
       }
     } else if (generalType === 'undo') {
       const undoToArrayMap = {
@@ -192,6 +266,109 @@ exports.editPostCtrl = async (req, res) => {
     res.status(500).json({ status: 'error', message: 'Internal Server Error. Please try later' });
   }
 };
+// exports.rateMiniPostCtrl = async (req, res) => {
+//   try {
+
+//     const {postId, miniPostIndex} = req.body;
+//     const result = await PostsModel.updateOne(
+//       { _id: postId, 'miniPostsArray.indexId': miniPostIndex },
+//       { $push: { 'miniPostsArray.$.ratingsArray': req.userId } }
+//     );
+//     console.log(result)
+//     return res.status(200).json({ status: 'success'});
+
+//   } catch (error) {
+//     console.error("Error updating ratingsArray:", error);
+//     throw error;
+//   }
+// };
+
+exports.rateMiniPostCtrl = async (req, res) => {
+  try {
+    const { postId, miniPostIndex, noneVote } = req.body;
+    const userId = req.userId;
+
+    console.log(req.body);
+
+    const post = await PostsModel.findOne({
+      _id: postId,
+      'miniPostsArray.indexId': miniPostIndex,
+    });
+
+    if (!post) {
+      return res.status(404).json({ status: 'error', message: 'Post or mini post not found' });
+    }
+
+  
+    // Find the mini post within the post
+    const miniPost = post.miniPostsArray.find(mp => mp.indexId === miniPostIndex);
+    console.log(miniPost);
+    if (!miniPost) {
+      return res.status(404).json({ status: 'error', message: 'Mini post not found' });
+    }
+
+    const isRated = miniPost.ratingsArray.includes(userId);
+    let action;
+    
+    if (isRated) {
+      console.log('wuhuuu');
+      // If the user is already rated, pull (remove) the userId
+      await PostsModel.findByIdAndUpdate(
+        postId,
+        {
+          $pull: { 'miniPostsArray.$[elem].ratingsArray': userId },  // Pull from the specific mini post's ratingsArray
+        },
+        {
+          arrayFilters: [{ 'elem.indexId': miniPostIndex }]  // Ensure we're targeting the correct mini post
+        }
+      );
+      action = 'unrated'; 
+    } else {
+      // If noneVote is true, remove user's rating from all other mini posts
+      // if (noneVote) {
+        await PostsModel.findByIdAndUpdate(
+          postId,
+          {
+            $pull: {
+              'miniPostsArray.$[].ratingsArray': userId, // Pull from all mini posts except the one being rated
+            },
+          }
+        );
+      // }
+    
+      // Push (add) the userId to the specific mini post
+      await PostsModel.findByIdAndUpdate(
+        postId,  // Using postId directly
+        {
+          $push: {
+            'miniPostsArray.$[elem].ratingsArray': userId  // Push the userId to the specific mini post's ratingsArray
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.indexId': miniPostIndex }]  // Ensuring the update targets the correct mini post
+        }
+      );
+      
+      action = noneVote ? 'nonerate' : 'rated';
+    }
+    
+
+    console.log(action);
+
+    return res.status(200).json({
+      status: 'success',
+      message: action,
+    });
+
+  } catch (error) {
+    console.error('Error updating ratingsArray:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while updating ratingsArray.',
+    });
+  }
+};
+
 
 exports.deletePostCtrl = async (req, res) => {
   const { postId } = req.body; // Assuming postId is passed in the URL params

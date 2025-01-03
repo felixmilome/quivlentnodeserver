@@ -1,4 +1,8 @@
 const {UsersModel} = require('../models/usersModel.js');
+const {ChatsModel} = require('../models/chatsModel.js');
+const {PostsModel} = require('../models/postsModel.js');
+const {CommentsModel} = require('../models/commentsModel.js');
+
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const {jwtDecode} = require ('jwt-decode');
@@ -6,7 +10,10 @@ const {generateOtp, generateRandomString, generateUsernameFromEmail} = require('
 const { mailVerificationLink } = require('./emailsController.js')
 const {OAuth2Client} = require('google-auth-library');
 const { promisify } = require('util');
+const { sendSms } = require('./phoneController.js');
+const {ipGeolocator} = require ('../functions/index.js')
 
+//reqpass
 
 require('dotenv').config();
 const jwtSecret = process.env.JWT_SECRET;
@@ -15,12 +22,31 @@ const googleClientId = '713960857676-8funqpldk4d6cobt0f467giarc1u16tu.apps.googl
 const googleClient = new OAuth2Client(googleClientId);
 const verifyJwt = promisify(jwt.verify);
 
+// const fetchIpInfo = async (ipAddress) => {
+//     try {
+//       const response = await fetch(
+//         `https://ipinfo.io/${ipAddress}?token=${}`
+//       );
+
+//       if (!response.ok) {
+//         throw new Error("Failed to fetch IP info");
+//       }
+
+//       const data = await response.json();
+//      return data;
+//     } catch (err) {
+//       console.log(err.message);
+//       return null;
+//     }
+// }
+
 exports.registerCtrl = async (req,res) => { 
     
 
     try {
 
         const {identifierType} = req.body;
+        const ipGeolocation = await ipGeolocator(req?.body?.ip) //function returns null if missing
 
         if (identifierType === 'gmail'){
 
@@ -44,7 +70,7 @@ exports.registerCtrl = async (req,res) => {
                 if(existingUser){
 
                     const token = jwt.sign({userId: existingUser._id}, jwtSecret);                       
-                    res.json({status:'success', token:{userId:existingUser._id, token}, message:'Google Sign In Success!'});
+                    return res.json({status:'success', token:{userId:existingUser._id, token}, message:'Google Sign In Success!'});
 
                 }
                 else{
@@ -56,13 +82,21 @@ exports.registerCtrl = async (req,res) => {
                     const mkTimeNow = Date.now();
     
 
-                    const newUser = {
+                    const newUserNoLocation = {
                         username: randUsername,
                         email,
                         password: hashedPassword,
                         createdTime: mkTimeNow,
-                        emailVerified:true
+                        emailVerified:true,
+                        
                     };
+
+                    const newUser =  ipGeolocation?.state === true ?
+                     {...newUserNoLocation,
+                        countryCode:ipGeolocation?.countryCode,
+                        region: ipGeolocation?.region,
+                        coordinates: ipGeolocation?.coordinates
+                    } : newUserNoLocation;
 
                     console.log(newUser);
 
@@ -70,7 +104,7 @@ exports.registerCtrl = async (req,res) => {
                     const createdUser = await UsersModel.create(newUser);
                     const token = jwt.sign({userId: createdUser._id}, jwtSecret);
                         
-                    res.json({status:'success', token:{userId:createdUser._id, token}, message:'Google Sign Up Success!'});
+                    return res.json({status:'success', token:{userId:createdUser._id, token}, message:'Google Sign Up Success!'});
                 
                 }
 
@@ -83,7 +117,7 @@ exports.registerCtrl = async (req,res) => {
         }else{
 
             const {identifier, username, password, countryCode, dialCode} = req.body;
-            // console.log(req.body);
+             console.log(req.body);
             if (
                 (![identifier, identifierType, username, password].every(val => val && val?.length > 0))
                 ||
@@ -103,9 +137,10 @@ exports.registerCtrl = async (req,res) => {
             console.log(existingUser);
             
             const existingUsername = await UsersModel.findOne({username:username})
+            console.log(existingUsername);
 
             if(existingUser) return res.json({status: 'error', message: `${identifierType} already in use`});
-            if(existingUsername?._id?.length>0) return res.json({status: 'error', message: `username already in use`});
+            if(existingUsername) return res.json({status: 'error', message: `username already in use`});
             if( /^\S+$/.test(password) === false || password?.length < 5 || password?.length > 26)  res.json({status: 'error', message:"Invalid Password Format"});
             
             const hashedPassword = await bcrypt.hash (password, 12);  
@@ -119,12 +154,21 @@ exports.registerCtrl = async (req,res) => {
                 : {email:identifier},
             );
 
-            const newUser = {
+            const newUserNoLocation = {
                 username,
                 password: hashedPassword,
                 createdTime: mkTimeNow,
                 authOtp: otp
             };
+            
+            const newUser =  ipGeolocation?.state === true ?
+            {...newUserNoLocation,
+               countryCode:ipGeolocation?.countryCode,
+               region: ipGeolocation?.region,
+               coordinates: ipGeolocation?.coordinates
+           } : newUserNoLocation;
+
+           console.log(newUser);
             
             // Set phone or email based on identifierType
             if (identifierType === 'phone') {
@@ -138,27 +182,29 @@ exports.registerCtrl = async (req,res) => {
 
             const otpToken = jwt.sign({otpNumber: otp, userId:createdUser?._id, identifierType}, jwtOtpSecret, {expiresIn: "24h"});
 
-            if(identifierType === 'email' || identifierType === 'phone' ){
-
-                console.log(`http://localhost:5173/verify/${otpToken}`);
-
-                await mailVerificationLink (identifier, otpToken, username);
+            if(identifierType === 'email'){
+                const subject = "Verify Your Email";
+                const path = "verify";
+                await mailVerificationLink (identifier, subject, path, otpToken, username);
                     
             } 
-            //else if (identifierType === 'phone') {
-            //         //send link to number
-            // }
+            else if (identifierType === 'phone') {
+          
+                    const urlPath = `verify/${otpToken}`
+                    await sendSms(urlPath, identifier);
+             
+            }
             const token = jwt.sign({userId: createdUser._id}, jwtSecret);
             console.log(token);
             console.log('reg')
             
-            res.json({status:'success', token:{userId:createdUser._id, token}, message:'Sign Up Success!'});
+            return res.json({status:'success', token:{userId:createdUser._id, token}, message:'Sign Up Success!'});
         }
         
     } catch (error) { 
 
     console.log(error);
-    res.json({status:'error', message: 'Internal Server Error. Please Try Later'}); 
+    return res.json({status:'error', message: 'Internal Server Error. Please Try Later'}); 
 
     }
     
@@ -171,6 +217,9 @@ exports.loginCtrl = async (req,res) => {
     try{ 
 
         const {identifierType} = req.body;
+
+        console.log(req.body);
+
 
         if (identifierType === 'gmail'){
 
@@ -194,7 +243,7 @@ exports.loginCtrl = async (req,res) => {
                 if(existingUser){
 
                     const token = jwt.sign({userId: existingUser._id}, jwtSecret);                       
-                    res.json({status:'success', token:{userId:existingUser._id, token}, message:'Google Sign In Success!'});
+                    return res.json({status:'success', token:{userId:existingUser._id, token}, message:'Google Sign In Success!'});
 
                 }
                 else{
@@ -220,7 +269,7 @@ exports.loginCtrl = async (req,res) => {
                     const createdUser = await UsersModel.create(newUser);
                     const token = jwt.sign({userId: createdUser._id}, jwtSecret);
                         
-                    res.json({status:'success', token:{userId:createdUser._id, token}, message:'Google Sign Up Success!'});
+                    return res.json({status:'success', token:{userId:createdUser._id, token}, message:'Google Sign Up Success!'});
                 
                 }
 
@@ -256,12 +305,12 @@ exports.loginCtrl = async (req,res) => {
             console.log(token);
             console.log('log')
             
-            res.json({status:'success', token:{userId:existingUser._id, token}, message:'Log In Success!'});
+            return res.json({status:'success', token:{userId:existingUser._id, token}, message:'Log In Success!'});
         }
 
     } catch (error){
         console.log(error.message);
-        res.json({ status:'error', message: 'Internal Server Error. Please Try Later'});
+        return res.json({ status:'error', message: 'Internal Server Error. Please Try Later'});
     
     }
 }
@@ -274,7 +323,7 @@ exports.verifyRegisterLinkCtrl = async (req, res) => {
         console.log(token)
 
         // Step 1: Verify the JWT token
-        jwt.verify(token, jwtSecret, async (err, decodedData) => {
+        jwt.verify(token, jwtOtpSecret, async (err, decodedData) => {
             if (err) {
                 if (err.name === 'TokenExpiredError') {
                     return res.json({ status: 'error', message: 'Token expired' });
@@ -284,9 +333,10 @@ exports.verifyRegisterLinkCtrl = async (req, res) => {
             }
 
             const { otpNumber, userId, identifierType } = decodedData; // Extract necessary data from decoded token
-
+            console.log(decodedData);
             // Step 2: Fetch user by userId
             const existingUser = await UsersModel.findById(userId, { _id: 1, authOtp: 1 });
+            console.log(existingUser);
 
             if (!existingUser) {
                 return res.json({ status: 'error', message: 'User not found' });
@@ -305,15 +355,214 @@ exports.verifyRegisterLinkCtrl = async (req, res) => {
             const newToken = jwt.sign({ userId: existingUser._id }, jwtSecret);
 
             // Step 6: Send success response
-            res.json({status:'success', token:{userId:existingUser._id, token:newToken}, message:'Verification Success!'});
+            return res.json({status:'success', token:{userId:existingUser._id, token:newToken}, message:'Verification Success!'});
         });
 
     } catch (error) {
-        res.json({ status: 'error', message: 'Verification failed' });
+        return res.json({ status: 'error', message: 'Verification failed' });
     }
 };
 
- 
+
+exports.requestChangePasswordCtrl = async (req,res) => {
+
+        try{ 
+    
+            const {identifierType, identifier, newPassword} = req.body;
+
+            console.log('reqpass');
+
+            if( /^\S+$/.test(newPassword) === false || newPassword?.length < 5 || newPassword?.length > 26) return res.json({status: 'error', message:"Invalid Password Format"});
+
+            const query = identifierType === 'phone' ? { phone: identifier } : { email: identifier };
+
+            const existingUser = await UsersModel.findOne(query, { _id: 1, authOtp: 1, username:1, password:1 });
+           
+            if(!existingUser) return res.json({status:'error', message:"User Account Doesnt Exist"})
+            const passwordCorrect = await bcrypt.compare(newPassword, existingUser?.password);
+
+            if(passwordCorrect) return res.json({status: 'error', message:"New password is same as the old one"});
+            const otp = await generateOtp(5);
+            //send Otp Message
+
+            const otpToken = jwt.sign({otpNumber: otp, newPassword, userId:existingUser?._id, identifierType}, jwtOtpSecret, {expiresIn: "24h"});
+
+            if(identifierType === 'email'){
+
+                console.log(identifierType);
+
+                const subject = "Change Your Password";
+                const path = "verify-password";
+                await mailVerificationLink (identifier, subject, path, otpToken, existingUser?.username);
+                    
+            } 
+            else if (identifierType === 'phone') {
+                console.log(identifierType);
+                const urlPath = `verify-password/${otpToken}`
+                await sendSms(urlPath, identifier);
+            }
+            console.log("success mail sent");
+
+            await UsersModel.findByIdAndUpdate(existingUser?._id, {authOtp:otp});
+          
+            return res.json({status:'success', message:`A verification link has been sent to ${identifier}!`});
+            
+    
+        } catch (error){
+    
+            return res.json({message: 'Internal Server Error. Please Try Later'});
+        
+        }
+    }
+
+    
+exports.verifyPassChangeCtrl = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        console.log(token)
+
+        // Step 1: Verify the JWT token
+        jwt.verify(token, jwtOtpSecret, async (err, decodedData) => {
+            if (err) {
+                if (err.name === 'TokenExpiredError') {
+                    return res.json({ status: 'error', message: 'Token expired' });
+                } else {
+                    return res.json({ status: 'error', message: 'Invalid token' });
+                }
+            }
+
+            const { otpNumber, userId, identifierType, newPassword } = decodedData; // Extract necessary data from decoded token
+            console.log(decodedData);
+            // Step 2: Fetch user by userId
+            const existingUser = await UsersModel.findById(userId, { _id: 1, authOtp: 1 });
+            console.log(existingUser);
+
+            if (!existingUser) {
+                return res.json({ status: 'error', message: 'User not found' });
+            }
+
+            // Step 3: Compare the decoded OTP with user's stored OTP
+            if (!otpNumber?.length > 0 || otpNumber !== existingUser.authOtp) {
+                return res.json({ status: 'error', message: 'Invalid OTP' });
+            }
+
+            // Step 4: Update user and clear OTP after successful verification
+            const hashedPassword = await bcrypt.hash (newPassword, 12);
+            await UsersModel.findByIdAndUpdate(userId, { authOtp: null, password:hashedPassword, [identifierType === 'phone' ? 'phoneVerified' : 'emailVerified']: true });
+
+
+            // Step 5: Generate a new token for further use
+            const newToken = jwt.sign({ userId: existingUser._id }, jwtSecret);
+
+            // Step 6: Send success response
+            return res.json({status:'success', token:{userId:existingUser._id, token:newToken}, message:'Password Change Successful!'});
+        });
+
+    } catch (error) {
+        return res.json({ status: 'error', message: 'Password Change Failed' });
+    }
+};
+
+exports.requestDeleteCtrl = async (req,res) => {
+
+    try{ 
+
+
+        
+        const otp = await generateOtp(5);
+        const userId = req.userId;
+        const {identifierType} = req.body;
+        //send Otp Message
+
+
+        
+
+        const existingUser = await UsersModel.findById(userId, { phone:1, email: 1, authOtp: 1, username:1, password:1 });
+        
+        if (!existingUser) {
+            return res.json({ status: 'error', message: 'User not found' });
+        }
+
+        const otpToken = jwt.sign({otpNumber:otp, userId:userId, identifierType}, jwtOtpSecret, {expiresIn: "24h"});
+
+        if(identifierType === 'email'){
+
+            //console.log(identifierType);
+
+            const subject = "Delete Account";
+            const path = "delete-account";
+            await mailVerificationLink (existingUser?.email, subject, path, otpToken, existingUser?.username);
+                
+        } 
+        else if (identifierType === 'phone') {
+            console.log(identifierType);
+            const urlPath = `delete-account/${otpToken}`
+            await sendSms(urlPath, existingUser?.phone);
+        }
+        console.log("success mail sent");
+
+        await UsersModel.findByIdAndUpdate(existingUser?._id, {authOtp:otp});
+
+        const identifier = identifierType === 'phone' ? existingUser?.phone : existingUser?.email;
+        
+        return res.json({status:'success', message:`A verification link has been sent to ${identifier}!`});
+        
+
+    } catch (error){
+
+        return res.json({message: 'Internal Server Error. Please Try Later'});
+    
+    }
+}
+
+exports.verifyDeleteCtrl = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        console.log(token)
+
+        // Step 1: Verify the JWT token
+        jwt.verify(token, jwtOtpSecret, async (err, decodedData) => {
+            if (err) {
+                if (err.name === 'TokenExpiredError') {
+                    return res.json({ status: 'error', message: 'Token expired' });
+                } else {
+                    return res.json({ status: 'error', message: 'Invalid token' });
+                }
+            }
+
+            const { otpNumber, userId, identifierType} = decodedData; // Extract necessary data from decoded token
+            console.log(decodedData);
+            // Step 2: Fetch user by userId
+            const existingUser = await UsersModel.findById(userId, { _id: 1, authOtp: 1 });
+            console.log(existingUser);
+
+            if (!existingUser) {
+                return res.json({ status: 'error', message: 'User not found' });
+            }
+
+            // Step 3: Compare the decoded OTP with user's stored OTP
+            if (!otpNumber?.length > 0 || otpNumber !== existingUser.authOtp) {
+                return res.json({ status: 'error', message: 'Invalid OTP' });
+            }
+
+            await UsersModel.findByIdAndDelete(userId); 
+            await PostsModel.deleteMany({ creatorMiniProfile: userId });
+            await ChatsModel.deleteMany({ participants: userId });
+            await CommentsModel.deleteMany({ creatorMiniProfile:  userId });
+
+            // Step 6: Send success response
+            return res.json({status:'success', message:'Account Deleted Succesfully!'});
+        });
+
+    } catch (error) {
+        return res.json({ status: 'error', message: 'Password Change Failed' });
+    }
+};
+
+
+
 
 
 // exports.verifyPhoneOtpCtrl = async (req,res) => {

@@ -18,7 +18,7 @@ const sms = AfricasTalking.SMS;
 
 exports.sendSms = async(urlPath, receiver) => {
 
-    console.log('SMS receiver:', receiver);
+  
 
     const options = {
         // Set the numbers you want to send to in international format

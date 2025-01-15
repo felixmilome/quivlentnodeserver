@@ -12,7 +12,7 @@ exports.addPostCtrl = async(req,res) => {
       const userId = req.userId;
       const captionsArr = JSON.parse(req.body.captions);
       const title = JSON.parse(req.body.title);
-       console.log(captionsArr?.length)
+       
   
   
 
@@ -45,7 +45,7 @@ exports.addPostCtrl = async(req,res) => {
             publicity: 'PUBLIC',
 
           };
-          console.log(newPostData);
+        
 
           const newPost = new PostsModel(newPostData);
           const savedPost = await newPost.save();
@@ -78,7 +78,7 @@ exports.getPostsCtrl = async(req, res) => {
           path: 'viewersArray',
           model: 'UsersModel',
           select: postViewerPopulationData, // Select the fields you need for viewers
-        });
+        }) .sort({ createdTime: -1 }); ;
   
       return res.status(200).json({
         status:'success',
@@ -96,8 +96,8 @@ exports.getPostsCtrl = async(req, res) => {
             path: 'viewersArray',
             model: 'UsersModel',
             select: postViewerPopulationData, // Select the fields you need for viewers
-          });
-    ;
+          }) .sort({ createdTime: -1 }); ;
+    
     
         return res.status(200).json({
           status:'success',
@@ -146,7 +146,7 @@ exports.getAPostCtrl = async(req, res) => {
 exports.likePostCtrl = async (req, res) => {
   const { postId, type, generalType } = req.body;
   const userId = req.userId;
-  console.log(userId);
+
   try {
     // Find the post by ID
     const post = await PostsModel.findById(postId);
@@ -233,7 +233,7 @@ exports.likePostCtrl = async (req, res) => {
 exports.editPostCtrl = async (req, res) => {
   const { postId } = req.body; // Assuming postId is passed in the URL params
   const userId = req.userId;
-  console.log('edit')
+
   const post = await PostsModel.findById(postId);
 
   if (!post) {
@@ -288,7 +288,7 @@ exports.rateMiniPostCtrl = async (req, res) => {
     const { postId, miniPostIndex, noneVote } = req.body;
     const userId = req.userId;
 
-    console.log(req.body);
+
 
     const post = await PostsModel.findOne({
       _id: postId,
@@ -302,7 +302,7 @@ exports.rateMiniPostCtrl = async (req, res) => {
   
     // Find the mini post within the post
     const miniPost = post.miniPostsArray.find(mp => mp.indexId === miniPostIndex);
-    console.log(miniPost);
+
     if (!miniPost) {
       return res.status(404).json({ status: 'error', message: 'Mini post not found' });
     }
@@ -311,7 +311,7 @@ exports.rateMiniPostCtrl = async (req, res) => {
     let action;
     
     if (isRated) {
-      console.log('wuhuuu');
+   
       // If the user is already rated, pull (remove) the userId
       await PostsModel.findByIdAndUpdate(
         postId,
@@ -353,7 +353,6 @@ exports.rateMiniPostCtrl = async (req, res) => {
     }
     
 
-    console.log(action);
 
     return res.status(200).json({
       status: 'success',

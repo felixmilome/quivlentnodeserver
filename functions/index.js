@@ -22,7 +22,7 @@ exports.tokenVerifier = async(tok)=>{
     try{
     
       const decodedTok = await jwt.verify(tok, jwtSecretKey);
-      console.log({decodedTok});
+     
       return decodedTok
     
     }catch(error){
@@ -39,7 +39,7 @@ exports.tokenVerifier = async(tok)=>{
     try{
     
       const decodedTok = await jwt.verify(tok, jwtSecretKey);
-      console.log({decodedTok});
+ 
       const {otpNumber} = decodedTok;
       if (otpNumber === otp){
         return decodedTok
@@ -97,7 +97,7 @@ exports.ipGeolocator = async (ipAddress) => {
     }
 
     const data = await response.json();
-    console.log(data);
+ 
 
     if(!data?.loc) return null
 
@@ -106,7 +106,7 @@ exports.ipGeolocator = async (ipAddress) => {
     const countryCode = data?.country || '';
 
     const returnData = {state:true, coordinates:{lat, lng}, region, countryCode}
-    console.log(returnData);
+
     return returnData;
 
  

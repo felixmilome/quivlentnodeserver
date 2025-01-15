@@ -61,12 +61,12 @@ exports.registerCtrl = async (req,res) => {
             const {aud,exp,iss, email} = googleData;
 
       
-            console.log(payload);
+            //console.log(payload);
 
             if (aud === payload.aud && exp === payload.exp && iss === payload.iss && email === payload.email){
                 
                 const existingUser = await UsersModel.findOne({ email: email, emailVerified: true } , {_id:1});
-                console.log(existingUser);
+                //console.log(existingUser);
                 if(existingUser){
 
                     const token = jwt.sign({userId: existingUser._id}, jwtSecret);                       
@@ -98,7 +98,7 @@ exports.registerCtrl = async (req,res) => {
                         coordinates: ipGeolocation?.coordinates
                     } : newUserNoLocation;
 
-                    console.log(newUser);
+                   // console.log(newUser);
 
                 
                     const createdUser = await UsersModel.create(newUser);
@@ -117,7 +117,7 @@ exports.registerCtrl = async (req,res) => {
         }else{
 
             const {identifier, username, password, countryCode, dialCode} = req.body;
-             console.log(req.body);
+             //console.log(req.body);
             if (
                 (![identifier, identifierType, username, password].every(val => val && val?.length > 0))
                 ||
@@ -134,10 +134,10 @@ exports.registerCtrl = async (req,res) => {
                 : null;
 
             const existingUser = await UsersModel.findOne(identityMatchQuery, { _id: 1 });
-            console.log(existingUser);
+            //console.log(existingUser);
             
             const existingUsername = await UsersModel.findOne({username:username})
-            console.log(existingUsername);
+            //console.log(existingUsername);
 
             if(existingUser) return res.json({status: 'error', message: `${identifierType} already in use`});
             if(existingUsername) return res.json({status: 'error', message: `username already in use`});
@@ -168,7 +168,7 @@ exports.registerCtrl = async (req,res) => {
                coordinates: ipGeolocation?.coordinates
            } : newUserNoLocation;
 
-           console.log(newUser);
+        
             
             // Set phone or email based on identifierType
             if (identifierType === 'phone') {
@@ -195,8 +195,7 @@ exports.registerCtrl = async (req,res) => {
              
             }
             const token = jwt.sign({userId: createdUser._id}, jwtSecret);
-            console.log(token);
-            console.log('reg')
+          
             
             return res.json({status:'success', token:{userId:createdUser._id, token}, message:'Sign Up Success!'});
         }
@@ -218,7 +217,7 @@ exports.loginCtrl = async (req,res) => {
 
         const {identifierType} = req.body;
 
-        console.log(req.body);
+      
 
 
         if (identifierType === 'gmail'){
@@ -234,12 +233,12 @@ exports.loginCtrl = async (req,res) => {
             const {aud,exp,iss, email} = googleData;
 
       
-            console.log(payload);
+       
 
             if (aud === payload.aud && exp === payload.exp && iss === payload.iss && email === payload.email){
                 
                 const existingUser = await UsersModel.findOne({ email: email, emailVerified: true } , {_id:1});
-                console.log(existingUser);
+             
                 if(existingUser){
 
                     const token = jwt.sign({userId: existingUser._id}, jwtSecret);                       
@@ -263,7 +262,7 @@ exports.loginCtrl = async (req,res) => {
                         emailVerified:true
                     };
 
-                    console.log(newUser);
+                  
 
                 
                     const createdUser = await UsersModel.create(newUser);
@@ -283,7 +282,7 @@ exports.loginCtrl = async (req,res) => {
 
             const {identifier, identifierType, password} = req.body;
 
-            console.log(req.body);
+         
         
             const existingUser = await UsersModel.findOne(
                 
@@ -292,7 +291,7 @@ exports.loginCtrl = async (req,res) => {
                     : {email:identifier}, 
                 {_id:1, password:1}
             );
-            console.log(existingUser);
+       
 
             if (!existingUser) return res.json({status: 'error', message: "Invalid Log In Credentials"});
 
@@ -302,8 +301,7 @@ exports.loginCtrl = async (req,res) => {
 
             //console.log(loggedUser);
             const token = jwt.sign({userId: existingUser._id}, jwtSecret);
-            console.log(token);
-            console.log('log')
+           
             
             return res.json({status:'success', token:{userId:existingUser._id, token}, message:'Log In Success!'});
         }
@@ -320,8 +318,7 @@ exports.verifyRegisterLinkCtrl = async (req, res) => {
     try {
         const { token } = req.body;
 
-        console.log(token)
-
+      
         // Step 1: Verify the JWT token
         jwt.verify(token, jwtOtpSecret, async (err, decodedData) => {
             if (err) {
@@ -333,10 +330,10 @@ exports.verifyRegisterLinkCtrl = async (req, res) => {
             }
 
             const { otpNumber, userId, identifierType } = decodedData; // Extract necessary data from decoded token
-            console.log(decodedData);
+         
             // Step 2: Fetch user by userId
             const existingUser = await UsersModel.findById(userId, { _id: 1, authOtp: 1 });
-            console.log(existingUser);
+       
 
             if (!existingUser) {
                 return res.json({ status: 'error', message: 'User not found' });
@@ -370,7 +367,7 @@ exports.requestChangePasswordCtrl = async (req,res) => {
     
             const {identifierType, identifier, newPassword} = req.body;
 
-            console.log('reqpass');
+           
 
             if( /^\S+$/.test(newPassword) === false || newPassword?.length < 5 || newPassword?.length > 26) return res.json({status: 'error', message:"Invalid Password Format"});
 
@@ -389,7 +386,7 @@ exports.requestChangePasswordCtrl = async (req,res) => {
 
             if(identifierType === 'email'){
 
-                console.log(identifierType);
+            
 
                 const subject = "Change Your Password";
                 const path = "verify-password";
@@ -397,7 +394,7 @@ exports.requestChangePasswordCtrl = async (req,res) => {
                     
             } 
             else if (identifierType === 'phone') {
-                console.log(identifierType);
+              
                 const urlPath = `verify-password/${otpToken}`
                 await sendSms(urlPath, identifier);
             }
@@ -496,11 +493,11 @@ exports.requestDeleteCtrl = async (req,res) => {
                 
         } 
         else if (identifierType === 'phone') {
-            console.log(identifierType);
+         
             const urlPath = `delete-account/${otpToken}`
             await sendSms(urlPath, existingUser?.phone);
         }
-        console.log("success mail sent");
+   
 
         await UsersModel.findByIdAndUpdate(existingUser?._id, {authOtp:otp});
 
@@ -520,7 +517,7 @@ exports.verifyDeleteCtrl = async (req, res) => {
     try {
         const { token } = req.body;
 
-        console.log(token)
+    
 
         // Step 1: Verify the JWT token
         jwt.verify(token, jwtOtpSecret, async (err, decodedData) => {
@@ -533,10 +530,10 @@ exports.verifyDeleteCtrl = async (req, res) => {
             }
 
             const { otpNumber, userId, identifierType} = decodedData; // Extract necessary data from decoded token
-            console.log(decodedData);
+      
             // Step 2: Fetch user by userId
             const existingUser = await UsersModel.findById(userId, { _id: 1, authOtp: 1 });
-            console.log(existingUser);
+       
 
             if (!existingUser) {
                 return res.json({ status: 'error', message: 'User not found' });

@@ -1,33 +1,41 @@
-FROM debian:bullseye as builder
+# syntax = docker/dockerfile:1
 
+# Adjust NODE_VERSION as desired
 ARG NODE_VERSION=20.9.0
-ARG YARN_VERSION=1.22.22
+FROM node:${NODE_VERSION}-slim AS base
 
-RUN apt-get update; apt install -y curl
-RUN curl https://get.volta.sh | bash
-ENV VOLTA_HOME /root/.volta
-ENV PATH /root/.volta/bin:$PATH
-RUN volta install node@${NODE_VERSION} yarn@${YARN_VERSION}
+LABEL fly_launch_runtime="Node.js"
 
-#######################################################################
-
-RUN mkdir /app
+# Node.js app lives here
 WORKDIR /app
 
-ENV NODE_ENV production
+# Set production environment
+ENV NODE_ENV="production"
+ARG YARN_VERSION=1.22.22
+RUN npm install -g yarn@$YARN_VERSION --force
 
+
+# Throw-away build stage to reduce size of final image
+FROM base AS build
+
+# Install packages needed to build node modules
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
+
+# Install node modules
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+# Copy application code
 COPY . .
 
-RUN yarn install
-FROM debian:bullseye
 
-LABEL fly_launch_runtime="nodejs"
+# Final stage for app image
+FROM base
 
-COPY --from=builder /root/.volta /root/.volta
-COPY --from=builder /app /app
+# Copy built application
+COPY --from=build /app /app
 
-WORKDIR /app
-ENV NODE_ENV production
-ENV PATH /root/.volta/bin:$PATH
-
+# Start the server by default, this can be overwritten at runtime
+EXPOSE 3000
 CMD [ "yarn", "run", "start" ]

@@ -112,7 +112,7 @@ exports.likeCommentCtrl = async (req, res) => {
 
   const { commentId, type, generalType} = req.body; // Make sure generalType is included
   const userId = req.userId; // Assuming the user ID is set in the request context
-  console.log(req.body);
+
   try {
     // Find the Comment by ID
     const comment = await CommentsModel.findById(commentId);

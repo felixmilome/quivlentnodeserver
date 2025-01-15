@@ -4,6 +4,7 @@ const {uploadFilesToFirebase} = require('../functions/filesHandler.js')
 const {convertToUnixTime} = require('../functions/index.js')
 const {createNotification} = require('./controllerHandlers/notificationHandlers.js')
 
+const {ipGeolocator} = require ('../functions/index.js')
 
 const getUserPopulated = async (userId) => {
 
@@ -49,7 +50,7 @@ const getUserPopulated = async (userId) => {
 
 exports.getProfileCtrl = async (req, res) => {
   try { 
-    console.log('getProfile');
+ 
     // console.log(req.body);
     const userId = req.body.userId; // Assuming the user ID is passed as a route parameter
 
@@ -136,7 +137,7 @@ exports.sendOrAcceptMatchRequestCtrl = async (req, res) => {
                 new: true, // Return the updated document
                 select: '-password -authOtp', // Exclude sensitive fields
               }
-            );
+            ); 
             
             const myProfile = await getUserPopulated(myProfileUnpopulated?._id);
           
@@ -239,7 +240,7 @@ exports.sendOrAcceptMatchRequestCtrl = async (req, res) => {
 exports.blockOrUnblockUserCtrl = async (req, res) => {
   try {
     const { blockedUserId, type } = req.body;
-    console.log(req.body);
+  
     const userId = req.userId;
 
   
@@ -310,13 +311,22 @@ exports.blockOrUnblockUserCtrl = async (req, res) => {
 
 exports.editProfileCtrl = async (req, res) => {
   try {
-    console.log("edit profile");
+ 
     const userId = req.userId; // Assuming user ID is available from auth middleware
     const editedFields = req.body;
-     console.log(req?.body);
+
  
     // Build the update object
     const updateData = {};
+
+    if (editedFields.location === 'location') { 
+      
+      const ipGeolocation = await ipGeolocator(req?.body?.ip)
+      updateData.countryCode = ipGeolocation?.countryCode,
+      updateData.region = ipGeolocation?.region,
+      updateData.coordinates = ipGeolocation?.coordinates
+ 
+    }
 
     // Check for dateOfBirth and convert it if present
     if (editedFields.dateOfBirth) {

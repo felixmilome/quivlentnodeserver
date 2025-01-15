@@ -5,7 +5,7 @@ const {createNotification} = require('./controllerHandlers/notificationHandlers.
 exports.getChatsCtrl = async (req, res) => {
   try {
     const userId = req.userId; // Assuming you have user ID from req.user
-    console.log('get chats');
+    
     // Fetch chats for the user and populate necessary fields
     const chats = await ChatsModel.find({ participants: userId })
       .populate({
@@ -29,7 +29,7 @@ exports.getChatsCtrl = async (req, res) => {
 exports.getMessagesCtrl = async (req, res) => {
     try {
       const { chatId } = req.body; // Get chatId from request body
-      console.log('getMessages');
+   
       // Check if you can find by Id
       const messages = await MessagesModel.find({ chatId }) // Assuming MessagesModel has a field for chatId
         .populate({
@@ -67,12 +67,12 @@ exports.getMessagesCtrl = async (req, res) => {
       const {type, receiverId, messageText} = req?.body;
       const senderId = req.userId;
 
-      console.log(req.body)
+    
 
       const existingChat = await ChatsModel.findOne({
         participants: { $all: [senderId, receiverId] } // Ensure both participants are in the array
       })
-      console.log(existingChat?._id);
+  
 
       // if(existingChat && existingChat?.accepted === false) {
       // if(existingChat && type === 'request') {
@@ -127,7 +127,7 @@ exports.getMessagesCtrl = async (req, res) => {
           referenceId: editedChat?._id
         });
 
-        console.log(newNotification);
+     
 
         
         return res.status(201).json({ status: 'success', data: {newMessage:populatedMessage, newChat:editedChat, newNotification}, message: 'Message sent successfully' });
@@ -145,7 +145,7 @@ exports.getMessagesCtrl = async (req, res) => {
         });
     
         const savedChat = await chatData.save();
-       console.log(savedChat?._id)
+      
 
         const newMessage = new MessagesModel({
           senderId: senderId, // ID of the sender

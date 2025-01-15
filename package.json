@@ -26,5 +26,8 @@
     "twilio": "^5.3.4",
     "uuid": "^10.0.0",
     "uuidv4": "^6.2.13"
+  },
+  "devDependencies": {
+    "@flydotio/dockerfile": "^0.6.1"
   }
 }

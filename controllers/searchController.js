@@ -5,7 +5,7 @@ exports.searchCtrl = async (req, res) => {
     try {
          const { searchTerm } = req.body;
       
-        console.log(req.body);
+       // console.log(req.body);
  
 
         if (!searchTerm) {

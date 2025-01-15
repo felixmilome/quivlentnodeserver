@@ -18,7 +18,7 @@ exports.postReportCtrl = async(req,res) => {
           const newReport = new ReportsModel(newReportData);
            const savedReport = await newReport.save();
 
-            console.log (savedReport);
+ 
           
           res.json({status:'success', message:'Reported Successfully!'});
         

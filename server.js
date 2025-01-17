@@ -17,6 +17,12 @@ app.use(cors());
 app.use(express.json({limit: '100mb'}));
 app.use(express.urlencoded({extended: true, limit: '100mb'})); 
 
+app.use('/', (req,res)=>{
+  res.json({
+    status:200,
+    message:'Server Running'
+  })
+});
 app.use('/auth', authsRouter);
 app.use('/report', reportRouter);
 app.use('/profile', profileRouter);

@@ -184,7 +184,7 @@ exports.registerCtrl = async (req,res) => {
 
             if(identifierType === 'email'){
                 const subject = "Verify Your Email";
-                const path = "verify";
+                const path = "verify-account";
                 await mailVerificationLink (identifier, subject, path, otpToken, username);
                     
             } 
@@ -446,11 +446,12 @@ exports.verifyPassChangeCtrl = async (req, res) => {
 
             // Step 4: Update user and clear OTP after successful verification
             const hashedPassword = await bcrypt.hash (newPassword, 12);
-            await UsersModel.findByIdAndUpdate(userId, { authOtp: null, password:hashedPassword, [identifierType === 'phone' ? 'phoneVerified' : 'emailVerified']: true });
-
+            const updatedUser = await UsersModel.findByIdAndUpdate(userId, { authOtp: null, password:hashedPassword, [identifierType === 'phone' ? 'phoneVerified' : 'emailVerified']: true });
+            console.log(newPassword);
+            console.log(updatedUser);
 
             // Step 5: Generate a new token for further use
-            const newToken = jwt.sign({ userId: existingUser._id }, jwtSecret);
+            const newToken = jwt.sign({ userId: updatedUser._id }, jwtSecret);
 
             // Step 6: Send success response
             return res.json({status:'success', token:{userId:existingUser._id, token:newToken}, message:'Password Change Successful!'});

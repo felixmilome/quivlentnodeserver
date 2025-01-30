@@ -315,13 +315,18 @@ exports.editProfileCtrl = async (req, res) => {
     const userId = req.userId; // Assuming user ID is available from auth middleware
     const editedFields = req.body;
 
+   
+  
+
  
     // Build the update object
     const updateData = {};
 
-    if (editedFields.location === 'location') { 
+    if (editedFields.location) { 
+
+      const locationIp = editedFields?.locationData?.ip;
       
-      const ipGeolocation = await ipGeolocator(req?.body?.ip)
+      const ipGeolocation = await ipGeolocator(locationIp)
       updateData.countryCode = ipGeolocation?.countryCode,
       updateData.region = ipGeolocation?.region,
       updateData.coordinates = ipGeolocation?.coordinates

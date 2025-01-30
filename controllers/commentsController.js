@@ -1,6 +1,7 @@
 
 const { CommentsModel } = require( "../models/commentsModel");
 const {PostsModel} = require ('../models/postsModel.js') 
+const {commentsSummaryAI} = require('./controllerHandlers/aiHandlers.js')
 
 exports.addCommentCtrl = async(req,res) => {
  
@@ -30,6 +31,7 @@ exports.addCommentCtrl = async(req,res) => {
 
         // Find the parent post by postId
         const post = await PostsModel.findById(postId);
+      
         //console.log(post)
         if (!post) {
           return res.json({ status: 'error', message: 'Post not found' });
@@ -62,18 +64,28 @@ exports.addCommentCtrl = async(req,res) => {
 }
 
 exports.getCommentsCtrl = async(req, res) => {
+  const {postId} = req.body
     try {
-        const Comments = await CommentsModel.find()
+        const comments = await CommentsModel.find({postId})
           .populate({
             path: 'creatorMiniProfile',
             select: 'username dpPath _id',
           });
+
+  
+          const post = await PostsModel.findById(postId, { caption: 1 });
+          const postCaption = post?.caption ? post.caption : '';
+
+          //const commentAi = await commentsSummaryAI(postCaption, comments);
+          const commentAi = '';
     
         return res.status(200).json({
           status:'success',
-          data: Comments,
+          data: comments,
+          commentAI: commentAi,
           message: 'Comments fetched successfully'
         });
+        
       } catch (error) {
         console.error('Error fetching Comments:', error);
         return res.status(500).json({

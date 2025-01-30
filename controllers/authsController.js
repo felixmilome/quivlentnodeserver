@@ -46,7 +46,9 @@ exports.registerCtrl = async (req,res) => {
     try {
 
         const {identifierType} = req.body;
+    
         const ipGeolocation = await ipGeolocator(req?.body?.ip) //function returns null if missing
+     
 
         if (identifierType === 'gmail'){
 
@@ -67,7 +69,7 @@ exports.registerCtrl = async (req,res) => {
                 
                 const existingUser = await UsersModel.findOne({ email: email, emailVerified: true } , {_id:1});
                 //console.log(existingUser);
-                if(existingUser){
+                if(existingUser){ //Log them in if they exist
 
                     const token = jwt.sign({userId: existingUser._id}, jwtSecret);                       
                     return res.json({status:'success', token:{userId:existingUser._id, token}, message:'Google Sign In Success!'});
@@ -98,7 +100,7 @@ exports.registerCtrl = async (req,res) => {
                         coordinates: ipGeolocation?.coordinates
                     } : newUserNoLocation;
 
-                   // console.log(newUser);
+                    console.log(newUser);
 
                 
                     const createdUser = await UsersModel.create(newUser);

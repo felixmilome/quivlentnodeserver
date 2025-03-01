@@ -221,7 +221,7 @@ exports.editCommentCtrl = async (req, res) => {
 exports.deleteCommentCtrl = async (req, res) => {
   const { commentId } = req.body; // Assuming commentId is passed in the URL params
   const userId = req.userId; // Assuming userId is set in the request context
-
+  
   try {
     // Find the Comment by ID
     const Comment = await CommentsModel.findById(commentId);

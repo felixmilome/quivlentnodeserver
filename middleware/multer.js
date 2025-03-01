@@ -6,7 +6,7 @@ const memoStorage = multer.memoryStorage();
 
 function checkMulterFileType(file, cb){
    
-    const filetypes = /jpeg|jpg|png/;
+  const filetypes = /jpeg|jpg|png|gif|webp|bmp|svg/;
     // console.log({file});
     const mimetype = filetypes.test(file.mimetype);
   

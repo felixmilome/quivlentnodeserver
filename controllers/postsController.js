@@ -8,49 +8,93 @@ exports.addPostCtrl = async(req,res) => {
  
 
     try{
-    
+
       const userId = req.userId;
       const captionsArr = JSON.parse(req.body.captions);
       const title = JSON.parse(req.body.title);
+
+      const uploadedFilesInfo = await uploadFilesToFirebase(req.files, "/post", userId);
+      const downloadURLs = uploadedFilesInfo.map((file) => file.downloadURL);
+
+      // Ensure at least one valid caption or image exists
+      const firstCaption = captionsArr?.[0] || null;
+      const firstImage = downloadURLs?.[0] || null;
+
+      let miniPostsArray = [];
+
+      if (firstCaption !== null || firstImage !== null) {
+        miniPostsArray = captionsArr?.map((caption, index) => ({
+          indexId: index,
+          caption,
+          noneRating: false,
+          imageUrl: downloadURLs[index] || null, // Ensure pairing even if the image count is less than captions
+        })) || [];
+
+        if (miniPostsArray.length > 0) {
+          miniPostsArray.push({
+            indexId: captionsArr.length, // Will set index last automatically
+            caption: "none of the above",
+            noneRating: true,
+            imageUrl: null, // Set to null or any other default value if no image is needed
+          });
+        }
+      }
+
+      const newPostData = {
+        creatorMiniProfile: userId,
+        title,
+        miniPostsArray,
+        publicity: "PUBLIC",
+      };
+
+      const newPost = new PostsModel(newPostData);
+      const savedPost = await newPost.save();
+
+      res.json({ status: "success", data: savedPost, message: "posted successfully!" });
+
+    
+      // const userId = req.userId;
+      // const captionsArr = JSON.parse(req.body.captions);
+      // const title = JSON.parse(req.body.title);
        
   
   
 
-        const uploadedFilesInfo = await uploadFilesToFirebase(req.files, '/post', userId);
-        const downloadURLs = uploadedFilesInfo.map(file => file.downloadURL);
+      //   const uploadedFilesInfo = await uploadFilesToFirebase(req.files, '/post', userId);
+      //   const downloadURLs = uploadedFilesInfo.map(file => file.downloadURL);
 
-        const miniPostsArray = captionsArr?.length>0 ? 
-          captionsArr.map((caption, index) => ({
-            indexId:index,
-            caption,
-            noneRating:false,
-            imageUrl: downloadURLs[index] || null, // Ensure pairing even if the image count is less than captions
-          }))
-        :[];
+      //   const miniPostsArray = captionsArr?.length>0 ? 
+      //     captionsArr.map((caption, index) => ({
+      //       indexId:index,
+      //       caption,
+      //       noneRating:false,
+      //       imageUrl: downloadURLs[index] || null, // Ensure pairing even if the image count is less than captions
+      //     }))
+      //   :[];
 
-        captionsArr?.length>0 && miniPostsArray.push({
-          indexId: captionsArr?.length, //will set index last automatically
-          caption: "none of the above",
-          noneRating:true,
-          imageUrl: null,  // Set to null or any other default value if no image is needed
-        });
+      //   captionsArr?.length>0 && miniPostsArray.push({
+      //     indexId: captionsArr?.length, //will set index last automatically
+      //     caption: "none of the above",
+      //     noneRating:true,
+      //     imageUrl: null,  // Set to null or any other default value if no image is needed
+      //   });
 
-        const newPostData = {
-            creatorMiniProfile: userId, 
-            title,
-            miniPostsArray,
-            // captionsArray: captionsArr,
-            // filesArray: downloadURLs,
-            creatorMiniProfile: userId, 
-            publicity: 'PUBLIC',
+      //   const newPostData = {
+      //       creatorMiniProfile: userId, 
+      //       title,
+      //       miniPostsArray,
+      //       // captionsArray: captionsArr,
+      //       // filesArray: downloadURLs,
+      //       creatorMiniProfile: userId, 
+      //       publicity: 'PUBLIC',
 
-          };
+      //     };
         
 
-          const newPost = new PostsModel(newPostData);
-          const savedPost = await newPost.save();
+      //     const newPost = new PostsModel(newPostData);
+      //     const savedPost = await newPost.save();
           
-          res.json({status:'success', data:savedPost, message:'posted successfully!'});
+      //     res.json({status:'success', data:savedPost, message:'posted successfully!'});
         
 
         } catch (error){
@@ -379,9 +423,12 @@ exports.deletePostCtrl = async (req, res) => {
 
     if (!post) {
       return res.status(404).json({ status: 'error', message: 'Post not found' });
-    }
+    } 
 
     // Check if the user is the creator of the post
+    if (post.creatorMiniProfile.toString() !== userId.toString()) {
+      return res.status(403).json({ status: 'error', message: 'Unauthorized: You cannot delete this Comment' });
+    }
     // if (post.creatorMiniProfile !== userId) {
     //   console.log('noo')
     //   return res.status(403).json({ status: 'error', message: 'Unauthorized: You cannot delete this post' });

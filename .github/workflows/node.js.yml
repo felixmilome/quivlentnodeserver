@@ -31,4 +31,7 @@ jobs:
       run: |
         touch .env  # Create the .env file if it doesn't exist
         echo "${{secrets.PROD_ENV_FILE}}" > .env  # Store secret in .env from GitHub secrets
+        
+    - name: Restart PM2 application
+      run: pm2 restart quivlentnodeserver 
 

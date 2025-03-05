@@ -5,26 +5,30 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master" ]  # Ensure the branch is correct (you may want to use "main" if that's your default branch)
 
 jobs:
   build:
-
-    runs-on: self-hosted
+    runs-on: self-hosted  # This indicates that you're using a self-hosted runner. Make sure your runner is properly set up.
 
     strategy:
       matrix:
-        node-version: [20.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+        node-version: [20.x]  # Adjust if you need multiple Node.js versions
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
+    - uses: actions/checkout@v4  # Checkout the code
+
+    - name: Use Node.js ${{ matrix.node-version }}  # Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-    - run: npm ci
-    - run: |
-        touch .env
-        echo "${{secrets.PROD_ENV_FILE}}" > .env
+
+    - name: Install dependencies  # Run npm install instead of npm ci if the lock file is missing or needs regeneration
+      run: npm install
+
+    - name: Create .env file with secrets  # Write secrets to the .env file
+      run: |
+        touch .env  # Create the .env file if it doesn't exist
+        echo "${{secrets.PROD_ENV_FILE}}" > .env  # Store secret in .env from GitHub secrets
+

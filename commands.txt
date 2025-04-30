@@ -1,0 +1,20 @@
+//run ec2 terminal on localhost
+
+    ssh -i "quivlentnodepem.pem" ubuntu@ec2-3-69-31-47.eu-central-1.compute.amazonaws.com
+
+// to run github actionworker
+
+    cd ~/ubuntu/actions-runner-server
+    sudo ./svc.sh stop
+    sudo ./svc.sh start
+
+
+
+
+//NGINX
+sudo nano /etc/nginx/sites-available/default 
+
+Note
+You logged into ssh of aws ec2 then pulled code on its tl since gihub jobs wasnt working
+Then you added nano .env
+then editted sudo nano /etc/nginx/sites-available/default  

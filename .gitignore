@@ -1,0 +1,12 @@
+# Ignore node modules
+node_modules/
+
+# Ignore environment variables
+.env
+
+# ignore Pem
+quivlentnodepem.pem
+
+# Ignore build files
+build/.env
+.env

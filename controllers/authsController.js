@@ -383,7 +383,7 @@ exports.requestChangePasswordCtrl = async (req,res) => {
                 const urlPath = `verify-password/${otpToken}`
                 await sendSms(urlPath, identifier);
             }
-            console.log("success mail sent");
+            //console.log("success mail sent");
 
             await UsersModel.findByIdAndUpdate(existingUser?._id, {authOtp:otp});
           
@@ -402,7 +402,7 @@ exports.verifyPassChangeCtrl = async (req, res) => {
     try {
         const { token } = req.body;
 
-        console.log(token)
+        //console.log(token)
 
         // Step 1: Verify the JWT token
         jwt.verify(token, jwtOtpSecret, async (err, decodedData) => {
@@ -415,10 +415,10 @@ exports.verifyPassChangeCtrl = async (req, res) => {
             }
 
             const { otpNumber, userId, identifierType, newPassword } = decodedData; // Extract necessary data from decoded token
-            console.log(decodedData);
+            //console.log(decodedData);
             // Step 2: Fetch user by userId
             const existingUser = await UsersModel.findById(userId, { _id: 1, authOtp: 1 });
-            console.log(existingUser);
+            //console.log(existingUser);
 
             if (!existingUser) {
                 return res.json({ status: 'error', message: 'User not found' });
@@ -432,8 +432,8 @@ exports.verifyPassChangeCtrl = async (req, res) => {
             // Step 4: Update user and clear OTP after successful verification
             const hashedPassword = await bcrypt.hash (newPassword, 12);
             const updatedUser = await UsersModel.findByIdAndUpdate(userId, { authOtp: null, password:hashedPassword, [identifierType === 'phone' ? 'phoneVerified' : 'emailVerified']: true });
-            console.log(newPassword);
-            console.log(updatedUser);
+            //console.log(newPassword);
+            //console.log(updatedUser);
 
             // Step 5: Generate a new token for further use
             const newToken = jwt.sign({ userId: updatedUser._id }, jwtSecret);

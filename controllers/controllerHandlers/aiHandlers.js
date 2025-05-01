@@ -51,7 +51,7 @@ exports.commentsSummaryAI = async (postCaption, commentsArr) => {
   
       // Extract and log the result
       const summary = completion.choices[0].message.content;
-      console.log(summary);
+      //console.log(summary);
       return summary;
     } catch (error) {
       console.error("Error while generating comment summary:", error);
